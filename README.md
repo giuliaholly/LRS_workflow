@@ -10,6 +10,7 @@ main.nf
   - You may override any internal parameter of the included workflows from the command line (e.g. --dorado_model "sup", --pmdv_params "...", --reference "/path/ref.fa" )
 
   Usage examples:
+    
     NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --input_pod5 path/to/pod5/dir/ --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
     # Skip basecalling, start from fastq

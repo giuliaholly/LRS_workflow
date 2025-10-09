@@ -33,7 +33,7 @@ if (params.help) {
       Dorado parameters:
     --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
     --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
-    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory ./dorado_models/")
+    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/")
     --correct 		      default null
 
     --skip_QC		      Skip Samtools flagstat, Cramino and Nanoplot on bam file (default false)

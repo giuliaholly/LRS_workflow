@@ -21,7 +21,7 @@ ONLY WORKS WITH GPU!
     Dorado parameters:
     --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
     --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
-    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/test_pipeline_G/dorado_models/")
+    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory ./dorado_models/")
     --correct 		      default null
     --help                    Print this message and exit
 
@@ -46,7 +46,7 @@ Channel.from(tuples).set { input_pod5 }
 
 params.dorado_model = "sup"
 params.dorado_modified_bases = "--modified-bases 5mCG_5hmCG 6mA"
-params.dorado_params = "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/test_pipeline_G/dorado_models/"
+params.dorado_params = "--recursive --min-qscore 9 --models-directory ./dorado_models/"
 params.correct = null
 
 process BASECALLING {

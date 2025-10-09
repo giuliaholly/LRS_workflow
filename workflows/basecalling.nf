@@ -46,7 +46,7 @@ Channel.from(tuples).set { input_pod5 }
 
 params.dorado_model = "sup"
 params.dorado_modified_bases = "--modified-bases 5mCG_5hmCG 6mA"
-params.dorado_params = "--recursive --min-qscore 9 --models-directory ./dorado_models/"
+params.dorado_params = "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/"
 params.correct = null
 
 process BASECALLING {

@@ -1,6 +1,9 @@
 nextflow.enable.dsl = 2
 
-/*
+if (params.help) {
+    log.info """
+    main.nf - Orchestrates basecalling -> alignment -> variant_calling
+
   main.nf
   Orchestrates three existing Nextflow workflows (basecalling, alignment, variant_calling)
   so that they run sequentially (basecalling -> alignment -> variant calling) using the
@@ -15,21 +18,47 @@ nextflow.enable.dsl = 2
     command line (e.g. --dorado_model "sup", --pmdv_params "...", --reference "/path/ref.fa" )
 
   Usage examples (from shell):
-    nextflow -c nextflow.config run main.nf --input_pod5 "/path/to/pod5_dir" --sample sample1 --output_dir ./out
+    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --input_pod5 path/to/pod5/dir/ --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
     # Skip basecalling, start from fastq
-    nextflow -c nextflow.config run main.nf --skip_basecalling true --input_fastq "/path/to/sample.fastq.gz" --sample sample1 --output_dir ./out
+    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_basecalling true --input_fastq /path/to/sample.fastq --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
     # Skip basecalling and alignment, start from bam
-    nextflow -c nextflow.config run main.nf --skip_alignment true --input_bam "/path/to/sample.sorted.bam" --sample sample1 --output_dir ./out
+    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_alignment true --input_bam /path/to/sample.sorted.bam --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
-  Notes:
-  - This file composes the processes defined inside basecalling.nf, alignment.nf and
-    variant_calling.nf. It aliases duplicate process names (e.g. SAMTOOLS) to avoid
-    conflicts.
-  - The detailed per-tool parameters remain the same as in the original files and
-    can be overridden with command-line params.
-*/
+
+ All internal parameters from basecalling.nf, alignment.nf and variant_calling.nf
+    are available and can be overridden on the command line:
+
+      Dorado parameters:
+    --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
+    --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
+    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory ./dorado_models/")
+    --correct 		      default null
+
+    --skip_QC		      Skip Samtools flagstat, Cramino and Nanoplot on bam file (default false)
+    --skip_coverage	      Skip Mosdepth 
+
+    Minimap2 parameters:
+    --minimap2_params         Minimap2 parameters: https://github.com/lh3/minimap2?tab=readme-ov-file (default "-a -x lr:hqae -Y --MD --eqx") 
+
+    --skip_SNVs_PEPPER        Skip haplotag and SNV calling (default false)
+    --skip_CALL_SV            Skip SV calling (default false)
+
+    Pepper-Margin_DeepVariant paramenters:
+    --pmdv_params             Pepper-Margin_Deepvariant paramenters: https://github.com/kishwarshafin/pepper/blob/r0.8/docs/usage/usage_and_parameters.md (default "-t 20 --pass-only --ont_r10_q20 --phased_output --pepper_min_mapq 20 --pepper_min_snp_baseq 10 --pepper_min_indel_baseq 10 --dv_min_mapping_quality 20 --dv_min_base_quality 10")
+        
+    Sniffles2 parameters:
+    --sniffles_params         Sniffles2 parameters: https://github.com/fritzsedlazeck/Sniffles (default "")
+    
+    Bigclipper parameters:
+    --bigclipper_params       Bigclipper parameters: https://github.com/yuliamostovoy/bigclipper (default "-d 1000000 -c 10")
+
+
+    """
+    exit 0
+}
+  
 
 params.input_pod5  = params.input_pod5  ?: "./_dummy_pod5_"
 params.input_fastq = params.input_fastq ?: "./_dummy_fastq_"
@@ -55,26 +84,6 @@ params.skip_alignment = params.skip_alignment ?: false
 
 // Ensure an output dir exists (individual processes use params.output_dir)
 params.output_dir = params.output_dir ?: './results'
-
-if (params.help) {
-    log.info """
-    main.nf - Orchestrates basecalling -> alignment -> variant_calling
-
-    Options (high level):
-      --skip_basecalling   Skip the basecalling workflow and start from --input_fastq
-      --skip_alignment     Skip basecalling+alignment and start from --input_bam
-
-    All internal parameters from basecalling.nf, alignment.nf and variant_calling.nf
-    are available and can be overridden on the command line, for example:
-      --dorado_model sup
-      --reference /path/to/ref.fasta
-      --pmdv_params "--some-flag"
-
-    Example:
-      nextflow -c nextflow.config run main.nf --input_pod5 /path/to/pod5 --sample SAMPLE1 --output_dir ./out
-    """
-    exit 0
-}
 
 workflow {
 

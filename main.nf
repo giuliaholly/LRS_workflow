@@ -85,7 +85,7 @@ workflow {
      * - If skipped, we build `fastq_ready` channel from params.input_fastq
      */
 
-    if (!params.skip_basecalling) {
+    if ( !(params.skip_basecalling || params.skip_alignment) ) {
         // Build tuples [sample, file(pod5_path)] just like in the original basecalling.nf
         def samples = params.sample instanceof List ? params.sample : [params.sample]
         def inputs  = params.input_pod5 instanceof List ? params.input_pod5 : [params.input_pod5]

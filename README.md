@@ -19,3 +19,11 @@ main.nf
     # Skip basecalling and alignment, start from bam
     NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_alignment true --input_bam /path/to/sample.sorted.bam --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
+
+BASECALLING WITH DORADO (https://github.com/nanoporetech/dorado/?tab=readme-ov-file)
+
+Dorado parameters:
+    --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
+    --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
+    --dorado_params           Other dorado parameters:  (default "--recursive --min-qscore 9 --models-directory ./dorado_models/")
+    --correct 		            Use dorado correct (very time-consuming) (default null)

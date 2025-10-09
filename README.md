@@ -33,6 +33,22 @@ Dorado parameters:
     --dorado_params           Other dorado parameters (default "--recursive --min-qscore 9 --models-directory ./dorado_models/")
     --correct 		            Use dorado correct (very time-consuming) (default null)
 
+To download Dorado models:
+
+	dorado download --model <model_name> --models-directory ./dorado_models/
+
+simplex models
+ - dna_r10.4.1_e8.2_400bps_hac@v5.2.0
+ - dna_r10.4.1_e8.2_400bps_sup@v5.2.0
+ ...
+
+modification models
+ - dna_r10.4.1_e8.2_400bps_hac@v5.2.0_6mA@v1
+ - dna_r10.4.1_e8.2_400bps_sup@v5.2.0_5mC_5hmC@v1
+ - dna_r10.4.1_e8.2_400bps_sup@v5.2.0_5mCG_5hmCG@v1
+ - dna_r10.4.1_e8.2_400bps_sup@v5.2.0_4mC_5mC@v1
+ ...
+   
 
 alignment.nf
 

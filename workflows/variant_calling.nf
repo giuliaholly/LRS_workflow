@@ -72,7 +72,7 @@ reference_fasta_fai = file("${reference_fasta}.fai", checkIfExists: true)
 
 
 process SNVs_PEPPER {
- 	label 'cpu'
+ 	label 'gpu'
 	containerOptions = '--nv'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 

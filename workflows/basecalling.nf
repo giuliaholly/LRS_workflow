@@ -29,9 +29,8 @@ ONLY WORKS WITH GPU!
     exit 0
 }
 
-
-def samples = params.sample instanceof List ? params.sample : [params.sample]
-def inputs = params.input_pod5 instanceof List ? params.input_pod5 : [params.input_pod5]
+def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
+def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
 
 if (samples.size() != inputs.size()) {
     error "Il numero di samples (${samples.size()}) deve corrispondere al numero di input (${inputs.size()})"

@@ -20,10 +20,13 @@ if (params.help) {
   Usage examples (from shell):
     NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --input_pod5 path/to/pod5/dir/ --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
-    # Skip basecalling, start from fastq
+  On multiple samples:
+    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_1,sample_2,sample_3 --input_pod5 path/to/sample_1.pod5,path/to/sample_2.pod5,path/to/sample_3.pod5 --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
+
+  Skip basecalling, start from fastq
     NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_basecalling true --input_fastq /path/to/sample.fastq --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
-    # Skip basecalling and alignment, start from bam
+  Skip basecalling and alignment, start from bam
     NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_alignment true --input_bam /path/to/sample.sorted.bam --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
 
@@ -96,8 +99,9 @@ workflow {
 
     if ( !(params.skip_basecalling || params.skip_alignment) ) {
         // Build tuples [sample, file(pod5_path)] just like in the original basecalling.nf
-        def samples = params.sample instanceof List ? params.sample : [params.sample]
-        def inputs  = params.input_pod5 instanceof List ? params.input_pod5 : [params.input_pod5]
+
+	def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
+	def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
 
         if (samples.size() != inputs.size()) {
             error "The number of samples (${samples.size()}) must match the number of input_pod5 paths (${inputs.size()})"

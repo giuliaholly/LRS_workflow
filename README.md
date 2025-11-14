@@ -1,29 +1,83 @@
-Nextflow workflow for long-read sequencing ONT data analysis with slurm executor.
+Nextflow workflow for long-read sequencing ONT data analysis.
 
 main.nf
-  Orchestrates three existing Nextflow workflows (basecalling, alignment, variant_calling) so that they run sequentially (basecalling -> alignment -> variant calling) using the provided SLURM-based config. The three original files are in the ./workflows folder.
+Orchestrates Basecalling ? Alignment ? Variant Calling (DSL2, SLURM)
 
-  Behavior:
-  - By default runs basecalling -> alignment -> variant_calling
-  - --skip_basecalling  : skip basecalling and start from --input_fastq
-  - --skip_alignment    : skip basecalling+alignment and start from --input_bam
-  - You may override any internal parameter of the included workflows from the command line (e.g. --dorado_model "sup", --pmdv_params "...", --reference "/path/ref.fa" )
+    Description:
+      This pipeline sequentially runs:
+        1. Basecalling  (ONT Dorado GPU-based)
+        2. Alignment    (Minimap2)
+        3. Variant Calling (Pepper-Margin-DeepVariant + Sniffles + BigClipper)
+      using modular Nextflow processes and a shared SLURM + Apptainer configuration.
 
-  Usage examples:
+  GENERAL BEHAVIOR:
+      • By default: runs BASECALLING ? ALIGNMENT ? VARIANT_CALLING
+      • --skip_basecalling : skip basecalling and start from FASTQ (--input_fastq)
+      • --skip_alignment   : skip basecalling+alignment and start from BAM (--input_bam)
+      • Parameters from any subworkflow (basecalling.nf, alignment.nf, variant_calling.nf)
+        can be overridden from the command line.
+
+  USAGE EXAMPLES:
     
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --input_pod5 path/to/pod5/dir/ --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
+# Full pipeline from POD5
+      NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
+      NXF_TEMP=/path/to/tmp/ \\
+      APPTAINER_TMPDIR=/path/to/tmp/ \\
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --input_pod5 /path/to/pod5/dir/ \\
+          --output_dir /path/to/output/dir/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-  On multiple samples:
-    
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_1,sample_2,sample_3 --input_pod5 path/to/sample_1.pod5,path/to/sample_2.pod5,path/to/sample_3.pod5 --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
 
-Skip basecalling, start from fastq
+# Multiple samples
+      NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
+      NXF_TEMP=/path/to/tmp/ \\
+      APPTAINER_TMPDIR=/path/to/tmp/ \\
+      nextflow run main.nf \\
+          --sample sample_1,sample_2,sample_3 \\
+          --input_pod5 path1,path2,path3 \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-	NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_basecalling true --input_fastq /path/to/sample.fastq --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
-   
-Skip basecalling and alignment, start from bam
+# Skip basecalling (start from FASTQ or UBAM)
+      NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
+      NXF_TEMP=/path/to/tmp/ \\
+      APPTAINER_TMPDIR=/path/to/tmp/ \\
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --skip_basecalling true \\
+          --input_fastq /path/to/sample.fastq \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-	NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_alignment true --input_bam /path/to/sample.sorted.bam --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
+# Skip basecalling + alignment (start from aligned sorted indexed BAM)
+      NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
+      NXF_TEMP=/path/to/tmp/ \\
+      APPTAINER_TMPDIR=/path/to/tmp/ \\
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --skip_alignment true \\
+          --input_bam /path/to/sample.sorted.bam \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
+
 
 Before usage, make sure to download all the necessary docker images and use the right file name in the nextflow.config
 

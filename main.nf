@@ -54,7 +54,7 @@ if (params.help) {
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-      # Skip basecalling (start from FASTQ)
+      # Skip basecalling (start from FASTQ or UBAM)
       nextflow run main.nf \\
           --sample sample_name \\
           --skip_basecalling true \\

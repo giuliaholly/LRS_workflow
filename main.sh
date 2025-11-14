@@ -10,8 +10,8 @@
 source /shared/conda/miniconda3/bin/activate
 conda activate nextflow-apptainer
 
-WORK_DIR="/shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow"
-SINGULARITY_CACHE="/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container"
+WORK_DIR="path/to/work/dir"
+SINGULARITY_CACHE="path/to/singularity/cache"
 
 export NXF_TEMP="${WORK_DIR}/tmp"
 export APPTAINER_TMPDIR="${WORK_DIR}/tmp"
@@ -21,8 +21,8 @@ nextflow run main.nf \
     --sample test \
     --input_pod5 ./test_pod5/ \
     --output_dir . \
-    --reference /shared/archive/ngsbo/migrated-from-ngsra/db/CHM13_assembly/chm13v2.0.fa \
+    --reference path/to/reference.fa \
     -c nextflow.config \
-    --account_name BC+giulia.olivucci \
+    --account_name name \
     --use_gpu true \
-    --bind_path /shared/archive/ngsbo/migrated-from-ngsra/db/CHM13_assembly/,/shared/work/PI-tommaso.pippucci/ringtp22/,/shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/,/shared/work/PI-tommaso.pippucci/schedulers/tmp/,/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/
+    --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/

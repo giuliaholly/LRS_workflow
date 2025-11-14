@@ -2,70 +2,120 @@ nextflow.enable.dsl = 2
 
 if (params.help) {
     log.info """
-    main.nf - Orchestrates basecalling -> alignment -> variant_calling
+    ==================================================================================================
+                                          LRS WORKFLOW HELP
+    --------------------------------------------------------------------------------------------------
 
   main.nf
-  Orchestrates three existing Nextflow workflows (basecalling, alignment, variant_calling)
-  so that they run sequentially (basecalling -> alignment -> variant calling) using the
-  provided SLURM-based config. The three original files are expected to be in the
-  ./workflows folder and are included below as process/workflow imports.
+   Orchestrates Basecalling ? Alignment ? Variant Calling (DSL2, SLURM)
 
-  Behavior:
-  - By default runs basecalling -> alignment -> variant_calling
-  - --skip_basecalling  : skip basecalling and start from --input_fastq
-  - --skip_alignment    : skip basecalling+alignment and start from --input_bam
-  - You may override any internal parameter of the included workflows from the
-    command line (e.g. --dorado_model "sup", --pmdv_params "...", --reference "/path/ref.fa" )
+    Description:
+      This pipeline sequentially runs:
+        1. Basecalling  (ONT Dorado GPU-based)
+        2. Alignment    (Minimap2)
+        3. Variant Calling (Pepper-Margin-DeepVariant + Sniffles + BigClipper)
+      using modular Nextflow processes and a shared SLURM + Apptainer configuration.
 
-  Usage examples (from shell):
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --input_pod5 path/to/pod5/dir/ --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
+    --------------------------------------------------------------------------------------------------
+    GENERAL BEHAVIOR
+    --------------------------------------------------------------------------------------------------
+      • By default: runs BASECALLING ? ALIGNMENT ? VARIANT_CALLING
+      • --skip_basecalling : skip basecalling and start from FASTQ (--input_fastq)
+      • --skip_alignment   : skip basecalling+alignment and start from BAM (--input_bam)
+      • Parameters from any subworkflow (basecalling.nf, alignment.nf, variant_calling.nf)
+        can be overridden from the command line.
 
-  On multiple samples:
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_1,sample_2,sample_3 --input_pod5 path/to/sample_1.pod5,path/to/sample_2.pod5,path/to/sample_3.pod5 --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
-
-  Skip basecalling, start from fastq
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_basecalling true --input_fastq /path/to/sample.fastq --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
-
-  Skip basecalling and alignment, start from bam
-    NXF_APPTAINER_CACHEDIR=/path/to/container/ NXF_TEMP=/path/to/tmp/ APPTAINER_TMPDIR=/path/to/tmp/ nextflow run main.nf --sample sample_name --skip_alignment true --input_bam /path/to/sample.sorted.bam --output_dir path/to/output/dir/ --reference /path/to/reference.fa -c ./workflows/nextflow.config --bind_path
-
-
- All internal parameters from basecalling.nf, alignment.nf and variant_calling.nf
-    are available and can be overridden on the command line:
-
-      Dorado parameters:
-    --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
-    --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
-    --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/")
-    --correct 		      default null
-
-    --skip_QC		      Skip Samtools flagstat, Cramino and Nanoplot on bam file (default false)
-    --skip_coverage	      Skip Mosdepth 
-
-    Minimap2 parameters:
-    --minimap2_params         Minimap2 parameters: https://github.com/lh3/minimap2?tab=readme-ov-file (default "-a -x lr:hqae -Y --MD --eqx") 
-
-    --skip_SNVs_PEPPER        Skip haplotag and SNV calling (default false)
-    --skip_CALL_SV            Skip SV calling (default false)
-
-    Pepper-Margin_DeepVariant paramenters:
-    --pmdv_params             Pepper-Margin_Deepvariant paramenters: https://github.com/kishwarshafin/pepper/blob/r0.8/docs/usage/usage_and_parameters.md (default "-t 20 --pass-only --ont_r10_q20 --phased_output --pepper_min_mapq 20 --pepper_min_snp_baseq 10 --pepper_min_indel_baseq 10 --dv_min_mapping_quality 20 --dv_min_base_quality 10")
-        
-    Sniffles2 parameters:
-    --sniffles_params         Sniffles2 parameters: https://github.com/fritzsedlazeck/Sniffles (default "")
-    
-    Bigclipper parameters:
-    --bigclipper_params       Bigclipper parameters: https://github.com/yuliamostovoy/bigclipper (default "-d 1000000 -c 10")
+    --------------------------------------------------------------------------------------------------
+    USAGE EXAMPLES
+    --------------------------------------------------------------------------------------------------
+      # Full pipeline from POD5
+      NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
+      NXF_TEMP=/path/to/tmp/ \\
+      APPTAINER_TMPDIR=/path/to/tmp/ \\
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --input_pod5 /path/to/pod5/dir/ \\
+          --output_dir /path/to/output/dir/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
 
+      # Multiple samples
+      nextflow run main.nf \\
+          --sample sample_1,sample_2,sample_3 \\
+          --input_pod5 path1,path2,path3 \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
+
+      # Skip basecalling (start from FASTQ)
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --skip_basecalling true \\
+          --input_fastq /path/to/sample.fastq \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
+
+      # Skip basecalling + alignment (start from BAM)
+      nextflow run main.nf \\
+          --sample sample_name \\
+          --skip_alignment true \\
+          --input_bam /path/to/sample.sorted.bam \\
+          --output_dir /path/to/output/ \\
+          --reference /path/to/reference.fa \\
+	  --account_name name \\
+          --use_gpu true \\
+          -c nextflow.config \\
+          --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
+
+
+    --------------------------------------------------------------------------------------------------
+    PARAMETERS SUMMARY
+    --------------------------------------------------------------------------------------------------
+      DORADO (Basecalling)
+        --dorado_model            Basecalling model [fast | hac | sup] (default: sup)
+        --dorado_modified_bases   Modified bases (default: "--modified-bases 5mCG_5hmCG 6mA")
+        --dorado_params           Additional Dorado params
+                                  (default: "--recursive --min-qscore 9 --models-directory ...")
+        --correct                 Enable dorado correction step (default: false)
+
+      QC / COVERAGE
+        --skip_QC                 Skip Flagstat, Cramino, Nanoplot (default: false)
+        --skip_coverage           Skip Mosdepth coverage (default: false)
+
+      ALIGNMENT (Minimap2)
+        --minimap2_params         Minimap2 parameters
+                                  (default: "-a -x lr:hqae -Y --MD --eqx")
+
+      VARIANT CALLING
+        --skip_SNVs_PEPPER        Skip Pepper-Margin-DeepVariant (default: false)
+        --skip_CALL_SV            Skip Sniffles SV calling (default: false)
+        --pmdv_params             Pepper-Margin-DeepVariant parameters
+        --sniffles_params         Sniffles2 parameters
+        --bigclipper_params       BigClipper parameters (default: "-d 1000000 -c 10")
+
+    --------------------------------------------------------------------------------------------------
+    For full documentation, see:
+      • Dorado:      https://github.com/nanoporetech/dorado
+      • Minimap2:    https://github.com/lh3/minimap2
+      • Pepper-MDV:  https://github.com/kishwarshafin/pepper
+      • Sniffles2:   https://github.com/fritzsedlazeck/Sniffles
+      • BigClipper:  https://github.com/yuliamostovoy/bigclipper
+    --------------------------------------------------------------------------------------------------
     """
     exit 0
 }
   
-
-params.input_pod5  = params.input_pod5  ?: "./_dummy_pod5_"
-params.input_fastq = params.input_fastq ?: "./_dummy_fastq_"
-params.input_bam   = params.input_bam   ?: "./_dummy_bam_"
 
 if (params.skip_basecalling && !params.input_fastq) {
     error "You used --skip_basecalling but did not provide --input_fastq"
@@ -76,9 +126,9 @@ if (params.skip_alignment && !params.input_bam) {
 }
 
 // Import individual processes from the three uploaded workflow scripts.
-include { BASECALLING; BAMTOFQ; CORRECT; SAMTOOLS_FAIDX; BASECALLING_REPORT } from './workflows/basecalling.nf'
-include { MINIMAP2; SAMTOOLS_BAM; FLAGSTAT; CRAMINO; NANOPLOT; COVERAGE } from './workflows/alignment.nf'
-include { SNVs_PEPPER; INDEX_HP; CALL_SV; BIGCLIPPER } from './workflows/variant_calling.nf'
+include { BASECALLING; BASECALLING_REPORT } from './modules/basecalling.nf'
+include { BAMTOFQ; MINIMAP2; SAMTOOLS_BAM; FLAGSTAT; CRAMINO; NANOPLOT; COVERAGE } from './modules/alignment.nf'
+include { SNVs_PEPPER; INDEX_HP; CALL_SV; BIGCLIPPER } from './modules/variant_calling.nf'
 
 // High-level control params (defaults can be overridden on the CLI)
 params.help = params.help ?: false
@@ -116,14 +166,7 @@ workflow {
 
         // Run basecalling processes (these are the same processes defined in basecalling.nf)
         basecalled = BASECALLING(base_input)
-        fastq_ready = BAMTOFQ(basecalled)
-
-        if (params.correct) {
-            fasta = CORRECT(fastq_ready)
-            fai = SAMTOOLS_FAIDX(fasta)
-        } else {
-            log.info "Skipping dorado correct"
-        }
+        report = BASECALLING_REPORT(basecalled)
 
     } else {
         // User requested to skip basecalling: accept FASTQ inputs
@@ -139,7 +182,7 @@ workflow {
             tuples << [ samples[i], file(inputs[i]) ]
         }
 
-        Channel.from(tuples).set { fastq_ready }
+        Channel.from(tuples).set { basecalled }
     }
 
     /*
@@ -148,22 +191,23 @@ workflow {
      * - If skipped, expect params.input_bam (sorted bam) and build the sorted_bam channel
      */
 
-    if (!params.skip_alignment) {
-        aligned = MINIMAP2(fastq_ready)
-        sorted_bam = SAMTOOLS_BAM(aligned)
-
-        if (!params.skip_QC) {
-            flagstat = FLAGSTAT(sorted_bam)
-            cramino  = CRAMINO(sorted_bam)
-            nanoplot = NANOPLOT(sorted_bam)
+    if (!params.skip_alignment)  {
+	fastq = BAMTOFQ(basecalled)
+	aligned = MINIMAP2(fastq)     
+	sorted_bam = SAMTOOLS_BAM(aligned)
+	
+	if (!params.skip_QC) {
+      	    flagstat = FLAGSTAT(sorted_bam)
+	    cramino = CRAMINO(sorted_bam)
+	    nanoplot = NANOPLOT(sorted_bam)
         } else {
-            log.info "Skip QC"
+            println "Skip QC"
         }
-
-        if (!params.skip_coverage) {
-            sample_coverage = COVERAGE(sorted_bam)
+	
+	if (!params.skip_coverage) {
+      	    sample_coverage = COVERAGE(sorted_bam)
         } else {
-            log.info "Skip coverage"
+            println "Skip coverage"
         }
 
     } else {

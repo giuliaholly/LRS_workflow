@@ -15,7 +15,7 @@ if (params.help) {
 
     Required:
     
-    --input_fastq             Path to fastq/fasta file
+    --input_fastq             Path to fastq/ubam file
     --output_dir              Path to output directory
     --reference               Path to reference file
     --sample		      Name of the sample
@@ -36,10 +36,10 @@ if (params.help) {
 
 
 def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
-def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
+def inputs  = params.input_fastq ? params.input_fastq.split(',').collect { it.trim() } : []
 
 if (samples.size() != inputs.size()) {
-    error "Il numero di samples (${samples.size()}) deve corrispondere al numero di input (${inputs.size()})"
+            error "The number of samples (${samples.size()}) must match the number of input paths (${inputs.size()})"
 }
 
 def tuples = []
@@ -60,46 +60,71 @@ params.coverage_params = "--no-per-base --fast-mode -b 1000 -Q 20"
 reference_fasta = file(params.reference, type: "file", checkIfExists: true)
 reference_fasta_fai = file("${reference_fasta}.fai", checkIfExists: true)
 
+process BAMTOFQ {
+    tag "$sample"
+    label 'big_job'
+
+    input:
+    tuple val(sample), path(input_file)
+
+    output:
+    tuple val(sample), path("${sample}.fastq")
+
+    script:
+    def ext = input_file.getName().tokenize('.')[-1]
+
+    if (ext == 'bam') {
+        """
+        samtools fastq -T "*" ${input_file} > ${sample}.fastq
+        """
+    } else if (ext == 'fastq') {
+        """
+        cp ${input_file} ${sample}.fastq
+        """
+    } else {
+        error "Unsupported file extension: $ext"
+    }
+}
 
 process MINIMAP2 {
     tag "$sample"
-    label 'cpu'
+    label 'big_job'
 
    input:
-    tuple val(sample), path(reads)
+    tuple val(sample), path("${sample}.fastq")
 
     output:
-    tuple val(sample), path("${sample}.*")
+    tuple val(sample), path("${sample}.sam")
 
     script:
     """
 
-        minimap2 ${params.minimap2_params} -R '@RG\\tID:$sample\\tSM:$sample\\tPL:ONT' -t ${task.cpus} ${params.reference} ${reads} > ${sample}.sam 
+        minimap2 ${params.minimap2_params} -R '@RG\\tID:$sample\\tSM:$sample\\tPL:ONT' -t ${task.cpus} ${params.reference} ${sample}.fastq > ${sample}.sam 
 
     """
 }
 
 process SAMTOOLS_BAM {
     tag "$sample"
-    label 'cpu'
+    label 'medium_job'
     publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
     input:
-    tuple val(sample), path(aln)
+    tuple val(sample), path("${sample}.sam")
 
     output:
     tuple val(sample), path("${sample}.sorted.bam"), path("${sample}.sorted.bam.bai")
     
     script:
     """
-    samtools sort -o ${sample}.sorted.bam ${aln}
+    samtools sort -o ${sample}.sorted.bam ${sample}.sam
     samtools index ${sample}.sorted.bam
     """
 }
 
 process FLAGSTAT {
    	tag "$sample"
-        label 'cpu'
+        label 'small_job'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
         input:
@@ -117,7 +142,7 @@ process FLAGSTAT {
 
 process CRAMINO {
    	tag "$sample"
-        label 'cpu'
+        label 'small_job'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
         input:
@@ -135,7 +160,7 @@ process CRAMINO {
 
 process NANOPLOT {
 	tag "$sample"
-        label 'cpu'
+        label 'small_job'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
           
         input:
@@ -153,7 +178,7 @@ process NANOPLOT {
 
 process COVERAGE {
     tag "$sample"
-    label 'cpu'
+    label 'medium_job'
 	publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
     input:
@@ -180,7 +205,8 @@ process COVERAGE {
 }
 
 workflow alignment {
-	aligned = MINIMAP2(sample_input)     
+	fastq = BAMTOFQ(sample_input)
+	aligned = MINIMAP2(fastq)     
 	sorted_bam = SAMTOOLS_BAM(aligned)
 	
 	if (!params.skip_QC) {

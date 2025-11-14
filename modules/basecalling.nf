@@ -22,7 +22,6 @@ ONLY WORKS WITH GPU!
     --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
     --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
     --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/")
-    --correct 		      default null
     --help                    Print this message and exit
 
        """.stripIndent()
@@ -33,7 +32,7 @@ def samples = params.sample ? params.sample.split(',').collect { it.trim() } : [
 def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
 
 if (samples.size() != inputs.size()) {
-    error "Il numero di samples (${samples.size()}) deve corrispondere al numero di input (${inputs.size()})"
+        error "The number of samples (${samples.size()}) must match the number of input paths (${inputs.size()})"
 }
 
 def tuples = []
@@ -46,12 +45,11 @@ Channel.from(tuples).set { input_pod5 }
 params.dorado_model = "sup"
 params.dorado_modified_bases = "--modified-bases 5mCG_5hmCG 6mA"
 params.dorado_params = "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/"
-params.correct = null
 
 process BASECALLING {
     tag "$sample"
     publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
-    label 'gpu'
+    label (params.use_gpu ? 'gpu' : 'big_job')
    
     input:
     tuple val(sample), path(input_dir)
@@ -60,77 +58,11 @@ process BASECALLING {
     tuple val(sample), path("${sample}.dorado.unaligned.bam")
 
     script:
-    """
-	export CUDA_VISIBLE_DEVICES=0
-	dorado basecaller ${params.dorado_model} ${input_dir} ${params.dorado_params} --device cuda:0 ${params.dorado_modified_bases} > ${sample}.dorado.unaligned.bam
-   
-    """
-}
 
-process BAMTOFQ {
-    tag "$sample"
-    publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
-    label 'cpu'
-
-    input:
-    tuple val(sample), path(sample_input)
-
-    output:
-    tuple val(sample), path("${sample}.fastq")
-
-    script:
-    """
-    samtools fastq -T "*" ${sample_input} > ${sample}.fastq
-    
-    """
-}
-
-process CORRECT {
-    tag "$sample"
-    publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
-    label 'gpu'
-  
-    input:
-    tuple val(sample), path(fastq)
-
-    output:
-    tuple val(sample), path("${sample}_corrected.dorado.fasta")
-
-    script:
-    """
-	export CUDA_VISIBLE_DEVICES=0
-
-	split -l 400000 ${fastq} ${sample}_chunk_
-
-	for f in ${sample}_chunk_*; do	
-
-  		filename=\$(basename "\$f")               
-  		output_file="\${filename}_corrected.fasta"
-
-		dorado correct --device cuda:0 "\$f" > ./\"\$output_file\"
-
-	done
-
-	cat \$(ls ${sample}_chunk_*_corrected.fasta | sort) > ${sample}_corrected.dorado.fasta
+def device_flag = params.use_gpu ? '--device cuda:0' : ''
 
     """
-}
-
-process SAMTOOLS_FAIDX {
-    tag "$sample"
-    publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
-    label 'cpu'
-
-    input:
-    tuple val(sample), path("${sample}_corrected.dorado.fasta")
-
-    output:
-    tuple val(sample), path("${sample}_corrected.dorado.fasta.fai")
-    
-    script:
-    """
-
-      samtools faidx ${sample}_corrected.dorado.fasta     
+    dorado basecaller ${params.dorado_model} ${input_dir} ${params.dorado_params} ${device_flag} ${params.dorado_modified_bases} > ${sample}.dorado.unaligned.bam
     """
 }
 
@@ -138,7 +70,7 @@ process BASECALLING_REPORT {
 
     tag "${sample}"
     publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
-    label 'cpu'
+    label 'small_job'
 
     input:
     tuple val(sample), path("${sample}.dorado.unaligned.bam")
@@ -240,13 +172,5 @@ OUT=${sample}.basecalling.report.txt
 
 workflow basecalling {
             basecalled = BASECALLING(input_pod5)
-            fastq_ready = BAMTOFQ(basecalled)
-		if (params.correct) {
-	    		fasta = CORRECT(fastq_ready)
-			fai = SAMTOOLS_FAIDX(fasta)
-   		 } else {
-        		log.info "Skipping dorado correct"
-    		}
-
 	    report = BASECALLING_REPORT(basecalled)
 }

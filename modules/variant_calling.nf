@@ -45,13 +45,12 @@ def samples = params.sample instanceof List ? params.sample : [params.sample]
 def inputs = params.input_bam instanceof List ? params.input_bam : [params.input_bam]
 
 if (samples.size() != inputs.size()) {
-    error "Il numero di samples (${samples.size()}) deve corrispondere al numero di input (${inputs.size()})"
+    error "number of samples (${samples.size()}) must be equal to number of input (${inputs.size()})"
 }
 
 def tuples = []
 for (int i = 0; i < samples.size(); i++) {
     def bam = file(inputs[i])
-    // cerco prima il .bam.bai (standard samtools), altrimenti il .bai “puro”
     def bai = file("${inputs[i]}.bai")
     if( !bai.exists() ) {
         bai = file(inputs[i].toString().replaceAll(/\.bam$/, ".bai"))
@@ -72,7 +71,7 @@ reference_fasta_fai = file("${reference_fasta}.fai", checkIfExists: true)
 
 
 process SNVs_PEPPER {
- 	label 'gpu'
+ 	label (params.use_gpu ? 'gpu' : 'big_job')
 	containerOptions = '--nv'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
@@ -90,13 +89,11 @@ process SNVs_PEPPER {
     	tuple val(sample), path("${sample}_snv.visual_report.html")
 
         script:
+
+def device_flag = params.use_gpu ? '--gpus all' : ''
+
         """
-	 if [ ${params.use_gpu} == true ]; then
-	export CUDA_VISIBLE_DEVICES=0
-	run_pepper_margin_deepvariant call_variant -b $bam -f $reference_fasta -o . -p ${sample}_snv ${params.pmdv_params} --gpus all
-    else
-        run_pepper_margin_deepvariant call_variant -b $bam -f $reference_fasta -o . -p ${sample}_snv ${params.pmdv_params}
-    fi
+	run_pepper_margin_deepvariant call_variant -b $bam -f $reference_fasta -o . -p ${sample}_snv ${params.pmdv_params} ${device_flag}
 
         """
 }
@@ -104,7 +101,7 @@ process SNVs_PEPPER {
 
 
 process INDEX_HP {
- 	label 'cpu'
+ 	label 'medium_job'
 	publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
 	input:
@@ -130,7 +127,7 @@ process INDEX_HP {
 
 
 process CALL_SV {
-	label 'cpu'
+	label 'medium_job'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
       
         input:
@@ -155,7 +152,7 @@ process CALL_SV {
 
 
 process BIGCLIPPER {
-        label 'cpu'
+        label 'small_job'
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
         
         input:

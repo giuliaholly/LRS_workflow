@@ -35,7 +35,7 @@ This pipeline sequentially runs:
           --input_pod5 /path/to/pod5/dir/ \\
           --output_dir /path/to/output/dir/ \\
           --reference /path/to/reference.fa \\
-	  --account_name name \\
+	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
@@ -49,7 +49,7 @@ This pipeline sequentially runs:
           --input_pod5 path1,path2,path3 \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
-	  --account_name name \\
+	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
@@ -64,7 +64,7 @@ This pipeline sequentially runs:
           --input_fastq /path/to/sample.fastq \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
-	  --account_name name \\
+	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/

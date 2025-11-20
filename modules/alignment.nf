@@ -106,7 +106,7 @@ process MINIMAP2 {
 
 process SAMTOOLS_BAM {
     tag "$sample"
-    label 'medium_job'
+    label 'big_job'
     publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
     input:

@@ -127,7 +127,7 @@ if (params.skip_alignment && !params.input_bam) {
 
 // Import individual processes from the three uploaded workflow scripts.
 include { BASECALLING; BASECALLING_REPORT } from './modules/basecalling.nf'
-include { BAMTOFQ; MINIMAP2; SAMTOOLS_BAM; FLAGSTAT; CRAMINO; NANOPLOT; COVERAGE } from './modules/alignment.nf'
+include { BAMTOFQ; MINIMAP2; SAMTOOLS_BAM; SAMTOOLS_TARGET; FLAGSTAT; CRAMINO; NANOPLOT; COVERAGE } from './modules/alignment.nf'
 include { SNVs_PEPPER; INDEX_HP; CALL_SV; BIGCLIPPER } from './modules/variant_calling.nf'
 
 // High-level control params (defaults can be overridden on the CLI)
@@ -195,17 +195,18 @@ workflow {
 	fastq = BAMTOFQ(basecalled)
 	aligned = MINIMAP2(fastq)     
 	sorted_bam = SAMTOOLS_BAM(aligned)
+	target_bam = SAMTOOLS_TARGET(sorted_bam)
 	
 	if (!params.skip_QC) {
-      	    flagstat = FLAGSTAT(sorted_bam)
-	    cramino = CRAMINO(sorted_bam)
-	    nanoplot = NANOPLOT(sorted_bam)
+      	    flagstat = FLAGSTAT(target_bam)
+	    cramino = CRAMINO(target_bam)
+	    nanoplot = NANOPLOT(target_bam)
         } else {
             println "Skip QC"
         }
 	
 	if (!params.skip_coverage) {
-      	    sample_coverage = COVERAGE(sorted_bam)
+      	    sample_coverage = COVERAGE(target_bam)
         } else {
             println "Skip coverage"
         }
@@ -239,7 +240,7 @@ workflow {
     if (!params.skip_SNVs_PEPPER) {
         // SNVs_PEPPER returns multiple channels; capture them as a result list and
         // pick the element that contains the haplotagged bam to feed INDEX_HP (same logic as original)
-        snv_results = SNVs_PEPPER(sorted_bam)
+        snv_results = SNVs_PEPPER(target_bam)
         // snv_results is list-like; SNVs_PEPPER(...) returns multiple outputs in order
         haplotagged_bam_file = snv_results[3]
         phased_snv_vcf = snv_results[2]
@@ -248,10 +249,10 @@ workflow {
         log.info "Skip SNVs_PEPPER"
     }
 
-    bigclipper = BIGCLIPPER(sorted_bam)
+    bigclipper = BIGCLIPPER(target_bam)
 
     if (!params.skip_CALL_SV) {
-        sample_vcf = CALL_SV(sorted_bam)
+        sample_vcf = CALL_SV(target_bam)
     } else {
         log.info "Skip CALL_SV"
     }

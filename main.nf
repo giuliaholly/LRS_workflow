@@ -34,6 +34,7 @@ if (params.help) {
       APPTAINER_TMPDIR=/path/to/tmp/ \\
       nextflow run main.nf \\
           --sample sample_name \\
+		  --bed target.bed \\
           --input_pod5 /path/to/pod5/dir/ \\
           --output_dir /path/to/output/dir/ \\
           --reference /path/to/reference.fa \\
@@ -47,6 +48,7 @@ if (params.help) {
       nextflow run main.nf \\
           --sample sample_1,sample_2,sample_3 \\
           --input_pod5 path1,path2,path3 \\
+		  --bed target.bed \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
 	  --account_name name \\
@@ -59,6 +61,7 @@ if (params.help) {
           --sample sample_name \\
           --skip_basecalling true \\
           --input_fastq /path/to/sample.fastq \\
+		  --bed target.bed \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
 	  --account_name name \\
@@ -66,7 +69,7 @@ if (params.help) {
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-      # Skip basecalling + alignment (start from BAM)
+      # Skip basecalling + alignment (start from target BAM)
       nextflow run main.nf \\
           --sample sample_name \\
           --skip_alignment true \\

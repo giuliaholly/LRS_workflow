@@ -1,6 +1,6 @@
 # LRS_WORKFLOW
 
-Nextflow workflow for long-read sequencing ONT data analysis with local and slurm executor.
+Nextflow workflow for long-read sequencing ONT data analysis with local and slurm executor. FOR ADAPTIVE SAMPLING
 
 main.nf
 
@@ -35,6 +35,7 @@ This pipeline sequentially runs:
           --input_pod5 /path/to/pod5/dir/ \\
           --output_dir /path/to/output/dir/ \\
           --reference /path/to/reference.fa \\
+		  --bed target.bed \\
 	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
@@ -49,6 +50,7 @@ This pipeline sequentially runs:
           --input_pod5 path1,path2,path3 \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
+		  --bed target.bed \\
 	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
@@ -64,12 +66,13 @@ This pipeline sequentially runs:
           --input_fastq /path/to/sample.fastq \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
+		  --bed target.bed \\
 	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\
           --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
 
-## Skip basecalling and alignment (start from aligned sorted indexed BAM)
+## Skip basecalling and alignment (start from aligned sorted indexed TARGET BAM)
       NXF_APPTAINER_CACHEDIR=/path/to/container/ \\
       NXF_TEMP=/path/to/tmp/ \\
       APPTAINER_TMPDIR=/path/to/tmp/ \\
@@ -79,6 +82,7 @@ This pipeline sequentially runs:
           --input_bam /path/to/sample.sorted.bam \\
           --output_dir /path/to/output/ \\
           --reference /path/to/reference.fa \\
+		  --bed target.bed \\
 	      --account_name name \\
           --use_gpu true \\
           -c nextflow.config \\

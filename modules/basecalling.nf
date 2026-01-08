@@ -14,7 +14,7 @@ ONLY WORKS WITH GPU!
 
     Required:
     
-    --input_pod5              Path to directory of pod5 files 
+    --samplesheet
     --output_dir              Path to output directory
     --sample		      Name of the sample
     
@@ -28,19 +28,26 @@ ONLY WORKS WITH GPU!
     exit 0
 }
 
-def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
-def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
-
-if (samples.size() != inputs.size()) {
-        error "The number of samples (${samples.size()}) must match the number of input paths (${inputs.size()})"
+if (!params.samplesheet) {
+    error "Missing required parameter: --samplesheet"
 }
 
-def tuples = []
-for (int i = 0; i < samples.size(); i++) {
-    tuples << [ samples[i], file(inputs[i]) ]
-}
+/*
+ * Read samplesheet
+ */
+Channel
+    .fromPath(params.samplesheet)
+    .splitCsv(header: true)
+    .map { row ->
+        def sample = row.sample
+        def pod5   = file(row.pod5)
 
-Channel.from(tuples).set { input_pod5 }
+        if (!sample || !pod5)
+            error "Invalid row in samplesheet: ${row}"
+
+        tuple(sample, pod5)
+    }
+    .set { input_pod5 }
 
 params.dorado_model = "sup"
 params.dorado_modified_bases = "--modified-bases 5mCG_5hmCG 6mA"

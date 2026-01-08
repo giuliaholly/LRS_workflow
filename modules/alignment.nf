@@ -15,8 +15,8 @@ if (params.help) {
 
     Required:
     
-    --bed					  bed file with target regions
-	--input_fastq             Path to fastq/ubam file
+    --samplesheet
+    --bed		      bed file with target regions
     --output_dir              Path to output directory
     --reference               Path to reference file
     --sample		   	      Name of the sample
@@ -35,20 +35,23 @@ if (params.help) {
     exit 0
 }
 
+/*
+ * Read samplesheet
+ */
+Channel
+    .fromPath(params.samplesheet)
+    .splitCsv(header: true)
+    .map { row ->
+        def sample = row.sample
+        def fastq   = file(row.fastq)
 
-def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
-def inputs  = params.input_fastq ? params.input_fastq.split(',').collect { it.trim() } : []
+        if (!sample || !fastq)
+            error "Invalid row in samplesheet: ${row}"
 
-if (samples.size() != inputs.size()) {
-            error "The number of samples (${samples.size()}) must match the number of input paths (${inputs.size()})"
-}
+        tuple(sample, fastq)
+    }
+    .set { input_fastq }
 
-def tuples = []
-for (int i = 0; i < samples.size(); i++) {
-    tuples << [ samples[i], file(inputs[i]) ]
-}
-
-Channel.from(tuples).set { sample_input }
 
 params.minimap2_params = "-a -x lr:hqae -Y --MD --eqx"
 params.skip_QC = false 
@@ -130,7 +133,7 @@ process SAMTOOLS_TARGET {
     publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
     input:
-    tuple val(sample), path("${sample}.sorted.bam")
+    tuple val(sample), path("${sample}.sorted.bam"), path("${sample}.sorted.bam.bai")
 
     output:
     tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
@@ -155,7 +158,7 @@ process FLAGSTAT {
 
         script:
         """
-	samtools flagstat ${sample}.sorted.bam > ${sample}_target_samtools_flagstat.txt
+	samtools flagstat ${sample}_target.sorted.bam > ${sample}_target_samtools_flagstat.txt
 
         """
 }
@@ -225,7 +228,7 @@ process COVERAGE {
 }
 
 workflow alignment {
-	fastq = BAMTOFQ(sample_input)
+	fastq = BAMTOFQ(input_fastq)
 	aligned = MINIMAP2(fastq)     
 	sorted_bam = SAMTOOLS_BAM(aligned)
 	target_bam = SAMTOOLS_TARGET(sorted_bam)

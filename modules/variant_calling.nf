@@ -14,7 +14,7 @@ if (params.help) {
 
     Required:
     
-    --input_bam               Path to sorted aligned bam
+    --samplesheet
     --output_dir              Path to output directory
     --reference               Path to reference file
     --sample		      Name of the sample
@@ -41,24 +41,23 @@ if (params.help) {
 }
 
 
-def samples = params.sample instanceof List ? params.sample : [params.sample]
-def inputs = params.input_bam instanceof List ? params.input_bam : [params.input_bam]
+/*
+ * Read samplesheet
+ */
+Channel
+    .fromPath(params.samplesheet)
+    .splitCsv(header: true)
+    .map { row ->
+        def sample = row.sample
+        def bam   = file(row.bam)
 
-if (samples.size() != inputs.size()) {
-    error "number of samples (${samples.size()}) must be equal to number of input (${inputs.size()})"
-}
+        if (!sample || !bam)
+            error "Invalid row in samplesheet: ${row}"
 
-def tuples = []
-for (int i = 0; i < samples.size(); i++) {
-    def bam = file(inputs[i])
-    def bai = file("${inputs[i]}.bai")
-    if( !bai.exists() ) {
-        bai = file(inputs[i].toString().replaceAll(/\.bam$/, ".bai"))
+        tuple(sample, bam)
     }
-    tuples << [ samples[i], bam, bai ]
-}
+    .set { input_bam }
 
-Channel.from(tuples).set { sample_input }
 
 params.skip_SNVs_PEPPER = false 
 params.skip_CALL_SV = false 
@@ -173,7 +172,7 @@ process BIGCLIPPER {
 
 workflow variant_calling {
         if (!params.skip_SNVs_PEPPER) {
-            snv_results = SNVs_PEPPER(sample_input)
+            snv_results = SNVs_PEPPER(input_bam)
             haplotagged_bam_file = snv_results[3]  
             phased_snv_vcf = snv_results[2]  
             INDEX_HP(haplotagged_bam_file)
@@ -181,10 +180,10 @@ workflow variant_calling {
             println "Skip SNVs_PEPPER"
         }
 
-        bigclipper = BIGCLIPPER(sample_input)
+        bigclipper = BIGCLIPPER(input_bam)
 
         if (!params.skip_CALL_SV) {
-            sample_vcf = CALL_SV(sample_input)
+            sample_vcf = CALL_SV(input_bam)
             } else {
             println "Skip CALL_SV"
         }

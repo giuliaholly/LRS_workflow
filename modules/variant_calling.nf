@@ -8,19 +8,36 @@ if (params.help) {
     SNVs and SVs calling for Long-Read ONT data
     Usage :
     
- NXF_APPTAINER_CACHEDIR=/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/ NXF_TEMP=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ APPTAINER_TMPDIR=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ nextflow run /shared/work/PI-tommaso.pippucci/ringtp22/variant_calling.nf -c /shared/work/PI-tommaso.pippucci/ringtp22/basecalling_nextflow.config --sample sample1 --input /path/to/input --output_dir /path/to/output --reference path/to/ref/fasta --aligner Minimap2 --bind_path
+nextflow run modules/variant_calling.nf -entry variant_calling \
+    --samplesheet samplesheet.csv \
+    --output_dir . \
+    --reference path/to/ref.fa \
+    -c nextflow.config \
+    --account_name name \
+    --bind_path /path/to/ref/,/path/to/cachedir/,path/to/samples/,etc
+ 
+
  
     ______________________________________________________________________
 
     Required:
     
-    --samplesheet
+    --samplesheet            CSV file with header:
+                              sample,bam
+
+                             One row per sample, for example:
+                              test1,/path/to/bam/
+
+
+                             Columns:
+                              - sample : sample identifier
+			      - bam    : path to bam (required)
+
     --output_dir              Path to output directory
     --reference               Path to reference file
-    --sample		      Name of the sample
     
     Optional:
-    
+
     --skip_SNVs_PEPPER        Skip haplotag and SNV calling (default false)
     --skip_CALL_SV            Skip SV calling (default false)
 
@@ -50,17 +67,19 @@ Channel
     .map { row ->
         def sample = row.sample
         def bam   = file(row.bam)
+	def bai    = file("${row.bam}.bai")
 
         if (!sample || !bam)
             error "Invalid row in samplesheet: ${row}"
 
-        tuple(sample, bam)
+        tuple(sample, bam, bai)
     }
     .set { input_bam }
 
 
 params.skip_SNVs_PEPPER = false 
 params.skip_CALL_SV = false 
+
 params.pmdv_params = "-t 20 --pass-only --ont_r10_q20 --phased_output --pepper_min_mapq 20 --pepper_min_snp_baseq 10 --pepper_min_indel_baseq 10 --dv_min_mapping_quality 20 --dv_min_base_quality 10"
 params.sniffles_params = ""
 params.bigclipper_params = "-d 1000000 -c 10"
@@ -180,10 +199,10 @@ workflow variant_calling {
             println "Skip SNVs_PEPPER"
         }
 
-        bigclipper = BIGCLIPPER(input_bam)
+        BIGCLIPPER(input_bam)
 
         if (!params.skip_CALL_SV) {
-            sample_vcf = CALL_SV(input_bam)
+            CALL_SV(input_bam)
             } else {
             println "Skip CALL_SV"
         }

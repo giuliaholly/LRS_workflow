@@ -8,27 +8,48 @@ if (params.help) {
     Alignment for Long-Read ONT data
     Usage :
     
- NXF_APPTAINER_CACHEDIR=/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/ NXF_TEMP=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ APPTAINER_TMPDIR=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ nextflow run /shared/work/PI-tommaso.pippucci/ringtp22/alignment.nf -c /shared/work/PI-tommaso.pippucci/ringtp22/basecalling_nextflow.config --sample sample1 --input /path/to/input --output_dir /path/to/output --reference path/to/ref/fasta --aligner Minimap2 --bind_path
+nextflow run modules/alignment.nf -entry alignment \
+    --samplesheet samplesheet.csv \
+    --bed path/to/bed/file/ \
+    --output_dir . \
+    --reference path/to/ref.fa \
+    -c nextflow.config \
+    --account_name name \
+    --bind_path /path/to/ref/,/path/to/cachedir/,path/to/samples/,etc
  
 
     ______________________________________________________________________
 
     Required:
+
+    --samplesheet            CSV file with header:
+                              sample,fastq
+
+                             One row per sample, for example:
+                              test1,/path/to/fastq/or/ubam/
+
+
+                             Columns:
+                              - sample : sample identifier
+                              - fastq  : path to fastq/ubam (required)
     
-    --samplesheet
-    --bed		      bed file with target regions
     --output_dir              Path to output directory
     --reference               Path to reference file
-    --sample		   	      Name of the sample
 
     Optional
+
+    --bed                  BED file with target regions (optional).
+                           If provided, target-restricted BAM, QC and coverage will be generated. 
+			   If not provided, analyses are performed on the full BAM.
 
     --skip_QC		      Skip Samtools flagstat, Cramino and Nanoplot on bam file (default false)
     --skip_coverage	      Skip Mosdepth 
 
     Minimap2 parameters:
+
     --minimap2_params         Minimap2 parameters: https://github.com/lh3/minimap2?tab=readme-ov-file (default "-a -x lr:hqae -Y --MD --eqx") 
     
+
        --help                    Print this message and exit
 
        """.stripIndent()
@@ -56,14 +77,13 @@ Channel
 params.minimap2_params = "-a -x lr:hqae -Y --MD --eqx"
 params.skip_QC = false 
 params.skip_coverage = false 
+params.bed = false
 params.cramino_params = ""
 params.nanoplot_params = ""
 params.coverage_params = "--no-per-base --fast-mode -Q 20"
 
-
 reference_fasta = file(params.reference, type: "file", checkIfExists: true)
 reference_fasta_fai = file("${reference_fasta}.fai", checkIfExists: true)
-bed_file = file(params.bed, type: "file", checkIfExists: true)
 
 process BAMTOFQ {
     tag "$sample"
@@ -138,10 +158,14 @@ process SAMTOOLS_TARGET {
     output:
     tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
     
+    when:
+    params.bed
+
     script:
     """
-    samtools view -L $bed_file -b ${sample}.sorted.bam | samtools sort -o ${sample}_target.sorted.bam
+    samtools view -L ${params.bed} -b ${sample}.sorted.bam | samtools sort -o ${sample}_target.sorted.bam
     samtools index ${sample}_target.sorted.bam
+
     """
 }
 
@@ -151,14 +175,15 @@ process FLAGSTAT {
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
         input:
-        tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
+        tuple val(sample), path(bam_file), path(bam_index), val(bam_prefix)
 
 	output:
-    	tuple val(sample), path("${sample}_target_samtools_flagstat.txt")
+    	tuple val(sample), path("${bam_prefix}_samtools_flagstat.txt")
 
         script:
         """
-	samtools flagstat ${sample}_target.sorted.bam > ${sample}_target_samtools_flagstat.txt
+	samtools flagstat ${bam_file} > ${bam_prefix}_samtools_flagstat.txt
+
 
         """
 }
@@ -169,14 +194,15 @@ process CRAMINO {
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
         input:
-        tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
+        tuple val(sample), path(bam_file), path(bam_index), val(bam_prefix)
 
 	output:
-    	tuple val(sample), path("${sample}_target_cramino.txt")
+  	tuple val(sample), path("${bam_prefix}_cramino.txt")
 
         script:
         """
-	cramino ${params.cramino_params} --hist ${sample}_target.sorted.bam > ${sample}_target_cramino.txt
+	cramino ${params.cramino_params} --hist ${bam_file} > ${bam_prefix}_cramino.txt
+
 
         """
 }
@@ -187,14 +213,15 @@ process NANOPLOT {
         publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
           
         input:
-        tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
+        tuple val(sample), path(bam_file), path(bam_index), val(bam_prefix)
 
         output:
         path 'nanoplot'
     
         script:
         """
-	NanoPlot -o nanoplot/ ${params.nanoplot_params} --bam ${sample}_target.sorted.bam 
+	NanoPlot -o nanoplot/ ${params.nanoplot_params} --bam ${bam_file}
+
         """
 }
 
@@ -202,48 +229,57 @@ process NANOPLOT {
 process COVERAGE {
     tag "$sample"
     label 'medium_job'
-	publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
+    publishDir "${params.output_dir}/results/${sample}", mode: 'copy'
 
     input:
-        tuple val(sample), path("${sample}_target.sorted.bam"), path("${sample}_target.sorted.bam.bai")
+    tuple val(sample), path(bam_file), path(bam_index), val(bam_prefix)
 
     output:
-    	tuple val(sample), path("${sample}_target.mosdepth.global.dist.txt")
-    	tuple val(sample), path("${sample}_target.mosdepth.summary.txt")
-      tuple val(sample), path("${sample}_target.regions.bed.gz")
-      tuple val(sample), path("${sample}_target.regions.bed.gz.csi")
+    tuple val(sample), path("${bam_prefix}.mosdepth.global.dist.txt")
+    tuple val(sample), path("${bam_prefix}.mosdepth.summary.txt")
+    tuple val(sample), path("${bam_prefix}.regions.bed.gz")
+    tuple val(sample), path("${bam_prefix}.regions.bed.gz.csi")
 
     script:
     	"""
-    	mosdepth ${params.coverage_params} --fasta $reference_fasta -b $bed_file ${sample}_target ${sample}_target.sorted.bam
+
+if [ -n "${params.bed}" ] && [ "${params.bed}" != "false" ]; then
+    echo "Using BED file ${params.bed}"
+    mosdepth ${params.coverage_params} --fasta ${params.reference} -b ${params.bed} ${bam_prefix} ${bam_file}
+else
+    echo "No BED file provided, computing coverage on full BAM"
+    mosdepth ${params.coverage_params} --fasta ${params.reference} -b 1000 ${bam_prefix} ${bam_file}
+fi
+
     	"""
 
-    	stub:
-    	"""
-    	touch ${sample}_target.mosdepth.global.dist.txt
-    	touch ${sample}_target.mosdepth.summary.txt
-        touch ${sample}_target.regions.bed.gz
-        touch ${sample}_target.regions.bed.gz.csi
-    	"""
 }
 
 workflow alignment {
 	fastq = BAMTOFQ(input_fastq)
 	aligned = MINIMAP2(fastq)     
 	sorted_bam = SAMTOOLS_BAM(aligned)
-	target_bam = SAMTOOLS_TARGET(sorted_bam)
 
-	if (!params.skip_QC) {
-      	    flagstat = FLAGSTAT(target_bam)
-	    cramino = CRAMINO(target_bam)
-	    nanoplot = NANOPLOT(target_bam)
-        } else {
-            println "Skip QC"
-        }
-	
-	if (!params.skip_coverage) {
-      	    sample_coverage = COVERAGE(target_bam)
-        } else {
-            println "Skip coverage"
-        }
+    bam_for_qc = params.bed \
+        ? SAMTOOLS_TARGET(sorted_bam) \
+        : sorted_bam
+
+    processed_bam = bam_for_qc.map { sample, bam_file, bam_index ->
+        def bam_prefix = params.bed ? "${sample}_target" : sample
+        tuple(sample, bam_file, bam_index, bam_prefix)
+    }
+
+    if (!params.skip_QC) {
+        FLAGSTAT(processed_bam)
+        CRAMINO(processed_bam)
+        NANOPLOT(processed_bam)
+    } else {
+        println "Skip QC"
+    }
+
+    if (!params.skip_coverage) {
+        COVERAGE(processed_bam)
+    } else {
+        println "Skip coverage"
+    }
 }

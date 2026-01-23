@@ -9,6 +9,8 @@ if (!params.samplesheet) {
     error "You must provide --samplesheet"
 }
 
+params.bed = false
+
 /*
  * Import modules
  */
@@ -69,21 +71,24 @@ if (!params.skip_alignment) {
     fastq_ch = BAMTOFQ(basecalled_ch)
     aligned_ch = MINIMAP2(fastq_ch)
     sorted_bam_ch = SAMTOOLS_BAM(aligned_ch)
-    target_bam_ch = SAMTOOLS_TARGET(sorted_bam_ch)
-
+    
+    bam_for_qc_ch = params.bed 
+        ? SAMTOOLS_TARGET(sorted_bam_ch) 
+        : sorted_bam_ch
+ 
     if (!params.skip_QC) {
-        FLAGSTAT(target_bam_ch)
-        CRAMINO(target_bam_ch)
-        NANOPLOT(target_bam_ch)
+        FLAGSTAT(bam_for_qc_ch)
+        CRAMINO(bam_for_qc_ch)
+        NANOPLOT(bam_for_qc_ch)
     }
 
     if (!params.skip_coverage) {
-        COVERAGE(target_bam_ch)
+        COVERAGE(bam_for_qc_ch)
     }
 
 } else {
 
-    target_bam_ch = samples_ch
+    bam_for_qc_ch = samples_ch
         .filter { it[-1] == 'BAM' }        
         .map { sample, bam, bai, _ -> tuple(sample, bam, bai) }
 
@@ -91,19 +96,17 @@ if (!params.skip_alignment) {
     /*
      * STAGE 3
      */
-if (!params.skip_SNVs_PEPPER) {
+    if (!params.skip_SNVs_PEPPER) {
+        snv_results_ch = SNVs_PEPPER(bam_for_qc_ch)
+        haplotagged_bam_ch = snv_results_ch[3]   
+        INDEX_HP(haplotagged_bam_ch)
+    }
 
-    snv_results_ch = SNVs_PEPPER(target_bam_ch)
-    haplotagged_bam_ch = snv_results_ch[3]   
-    INDEX_HP(haplotagged_bam_ch)
+    BIGCLIPPER(bam_for_qc_ch)
 
-}
-
-BIGCLIPPER(target_bam_ch)
-
-if (!params.skip_CALL_SV) {
-    CALL_SV(target_bam_ch)
-}
+    if (!params.skip_CALL_SV) {
+        CALL_SV(bam_for_qc_ch)
+    }
 
 }
 

@@ -6,19 +6,36 @@ if (params.help) {
     -----------------------------------------------------------------------
     Basecalling for Long-Read ONT data
     Usage :
-    
- NXF_APPTAINER_CACHEDIR=/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/ NXF_TEMP=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ APPTAINER_TMPDIR=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ nextflow run /shared/work/PI-tommaso.pippucci/ringtp22/basecalling.nf -c /shared/work/PI-tommaso.pippucci/ringtp22/basecalling_nextflow.config --sample sample1 --input /path/to/pod5_directory --output_dir /path/to/output --bind_path
+
+nextflow run modules/basecalling.nf -entry basecalling \
+    --samplesheet samplesheet.csv \
+    --input_pod5 ./test_pod5/ \
+    --output_dir . \
+    --reference path/to/ref.fa \
+    -c nextflow.config \
+    --account_name name \
+    --use_gpu true \
+    --bind_path /path/to/ref/,/path/to/cachedir/,path/to/samples/,etc
  
 ONLY WORKS WITH GPU!
     ______________________________________________________________________
 
     Required:
     
-    --samplesheet
+    --samplesheet             CSV file with header:
+                               sample,pod5
+
+                              One row per sample, for example:
+                               test1,/path/to/pod5/
+
+                              Columns:
+                               - sample : sample identifier
+                               - pod5   : path to POD5 directory
+
     --output_dir              Path to output directory
-    --sample		      Name of the sample
     
     Dorado parameters:
+
     --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
     --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
     --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/")

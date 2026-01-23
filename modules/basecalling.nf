@@ -6,19 +6,36 @@ if (params.help) {
     -----------------------------------------------------------------------
     Basecalling for Long-Read ONT data
     Usage :
-    
- NXF_APPTAINER_CACHEDIR=/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/ NXF_TEMP=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ APPTAINER_TMPDIR=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ nextflow run /shared/work/PI-tommaso.pippucci/ringtp22/basecalling.nf -c /shared/work/PI-tommaso.pippucci/ringtp22/basecalling_nextflow.config --sample sample1 --input /path/to/pod5_directory --output_dir /path/to/output --bind_path
+
+nextflow run modules/basecalling.nf -entry basecalling \
+    --samplesheet samplesheet.csv \
+    --input_pod5 ./test_pod5/ \
+    --output_dir . \
+    --reference path/to/ref.fa \
+    -c nextflow.config \
+    --account_name name \
+    --use_gpu true \
+    --bind_path /path/to/ref/,/path/to/cachedir/,path/to/samples/,etc
  
 ONLY WORKS WITH GPU!
     ______________________________________________________________________
 
     Required:
     
-    --input_pod5              Path to directory of pod5 files 
+    --samplesheet             CSV file with header:
+                               sample,pod5
+
+                              One row per sample, for example:
+                               test1,/path/to/pod5/
+
+                              Columns:
+                               - sample : sample identifier
+                               - pod5   : path to POD5 directory
+
     --output_dir              Path to output directory
-    --sample		      Name of the sample
     
     Dorado parameters:
+
     --dorado_model            Basecalling model with dorado: fast, hac, sup (default "sup")
     --dorado_modified_bases   Space-separated list of modifications following --modified-bases (default "--modified-bases 5mCG_5hmCG,6mA")
     --dorado_params           Other dorado parameters: https://github.com/nanoporetech/dorado/?tab=readme-ov-file (default "--recursive --min-qscore 9 --models-directory /shared/work/PI-tommaso.pippucci/ringtp22/LRS_workflow/dorado_models/")
@@ -28,19 +45,26 @@ ONLY WORKS WITH GPU!
     exit 0
 }
 
-def samples = params.sample ? params.sample.split(',').collect { it.trim() } : []
-def inputs  = params.input_pod5 ? params.input_pod5.split(',').collect { it.trim() } : []
-
-if (samples.size() != inputs.size()) {
-        error "The number of samples (${samples.size()}) must match the number of input paths (${inputs.size()})"
+if (!params.samplesheet) {
+    error "Missing required parameter: --samplesheet"
 }
 
-def tuples = []
-for (int i = 0; i < samples.size(); i++) {
-    tuples << [ samples[i], file(inputs[i]) ]
-}
+/*
+ * Read samplesheet
+ */
+Channel
+    .fromPath(params.samplesheet)
+    .splitCsv(header: true)
+    .map { row ->
+        def sample = row.sample
+        def pod5   = file(row.pod5)
 
-Channel.from(tuples).set { input_pod5 }
+        if (!sample || !pod5)
+            error "Invalid row in samplesheet: ${row}"
+
+        tuple(sample, pod5)
+    }
+    .set { input_pod5 }
 
 params.dorado_model = "sup"
 params.dorado_modified_bases = "--modified-bases 5mCG_5hmCG 6mA"

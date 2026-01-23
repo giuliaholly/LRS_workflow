@@ -8,19 +8,36 @@ if (params.help) {
     SNVs and SVs calling for Long-Read ONT data
     Usage :
     
- NXF_APPTAINER_CACHEDIR=/shared/work/PI-tommaso.pippucci/ringtp22/my_singularity_container/ NXF_TEMP=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ APPTAINER_TMPDIR=/shared/work/PI-tommaso.pippucci/schedulers/tmp/ nextflow run /shared/work/PI-tommaso.pippucci/ringtp22/variant_calling.nf -c /shared/work/PI-tommaso.pippucci/ringtp22/basecalling_nextflow.config --sample sample1 --input /path/to/input --output_dir /path/to/output --reference path/to/ref/fasta --aligner Minimap2 --bind_path
+nextflow run modules/variant_calling.nf -entry variant_calling \
+    --samplesheet samplesheet.csv \
+    --output_dir . \
+    --reference path/to/ref.fa \
+    -c nextflow.config \
+    --account_name name \
+    --bind_path /path/to/ref/,/path/to/cachedir/,path/to/samples/,etc
+ 
+
  
     ______________________________________________________________________
 
     Required:
     
-    --input_bam               Path to sorted aligned bam
+    --samplesheet            CSV file with header:
+                              sample,bam
+
+                             One row per sample, for example:
+                              test1,/path/to/bam/
+
+
+                             Columns:
+                              - sample : sample identifier
+			      - bam    : path to bam (required)
+
     --output_dir              Path to output directory
     --reference               Path to reference file
-    --sample		      Name of the sample
     
     Optional:
-    
+
     --skip_SNVs_PEPPER        Skip haplotag and SNV calling (default false)
     --skip_CALL_SV            Skip SV calling (default false)
 
@@ -41,27 +58,28 @@ if (params.help) {
 }
 
 
-def samples = params.sample instanceof List ? params.sample : [params.sample]
-def inputs = params.input_bam instanceof List ? params.input_bam : [params.input_bam]
+/*
+ * Read samplesheet
+ */
+Channel
+    .fromPath(params.samplesheet)
+    .splitCsv(header: true)
+    .map { row ->
+        def sample = row.sample
+        def bam   = file(row.bam)
+	def bai    = file("${row.bam}.bai")
 
-if (samples.size() != inputs.size()) {
-    error "number of samples (${samples.size()}) must be equal to number of input (${inputs.size()})"
-}
+        if (!sample || !bam)
+            error "Invalid row in samplesheet: ${row}"
 
-def tuples = []
-for (int i = 0; i < samples.size(); i++) {
-    def bam = file(inputs[i])
-    def bai = file("${inputs[i]}.bai")
-    if( !bai.exists() ) {
-        bai = file(inputs[i].toString().replaceAll(/\.bam$/, ".bai"))
+        tuple(sample, bam, bai)
     }
-    tuples << [ samples[i], bam, bai ]
-}
+    .set { input_bam }
 
-Channel.from(tuples).set { sample_input }
 
 params.skip_SNVs_PEPPER = false 
 params.skip_CALL_SV = false 
+
 params.pmdv_params = "-t 20 --pass-only --ont_r10_q20 --phased_output --pepper_min_mapq 20 --pepper_min_snp_baseq 10 --pepper_min_indel_baseq 10 --dv_min_mapping_quality 20 --dv_min_base_quality 10"
 params.sniffles_params = ""
 params.bigclipper_params = "-d 1000000 -c 10"
@@ -173,7 +191,7 @@ process BIGCLIPPER {
 
 workflow variant_calling {
         if (!params.skip_SNVs_PEPPER) {
-            snv_results = SNVs_PEPPER(sample_input)
+            snv_results = SNVs_PEPPER(input_bam)
             haplotagged_bam_file = snv_results[3]  
             phased_snv_vcf = snv_results[2]  
             INDEX_HP(haplotagged_bam_file)
@@ -181,10 +199,10 @@ workflow variant_calling {
             println "Skip SNVs_PEPPER"
         }
 
-        bigclipper = BIGCLIPPER(sample_input)
+        BIGCLIPPER(input_bam)
 
         if (!params.skip_CALL_SV) {
-            sample_vcf = CALL_SV(sample_input)
+            CALL_SV(input_bam)
             } else {
             println "Skip CALL_SV"
         }

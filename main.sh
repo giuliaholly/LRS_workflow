@@ -18,11 +18,10 @@ export APPTAINER_TMPDIR="${WORK_DIR}/tmp"
 export NXF_APPTAINER_CACHEDIR="${SINGULARITY_CACHE}"
 
 nextflow run main.nf \
-    --sample test \
-    --input_pod5 ./test_pod5/ \
-    --output_dir . \
-    --reference path/to/reference.fa \
-    -c nextflow.config \
-    --account_name name \
-    --use_gpu true \
-    --bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
+--run <pipeline|pipeline_skip_basecalling|basecalling|alignment|variant_calling> \
+--samplesheet samplesheet.csv \
+--output_dir ./results \
+--reference /path/to/ref.fa \
+[options] \
+-c nextflow.config \
+--bind_path /path/to/pod5/dir/,/path/to/output/dir/,/path/to/reference.fa,path/to/singularity/cache,path/to/tmp/dir/
